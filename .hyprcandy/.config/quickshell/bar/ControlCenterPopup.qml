@@ -67,13 +67,13 @@ PanelWindow {
     property string _sddmBlurVal:    "55"
 
     // ── Hyprland entry values ─────────────────────────────────────────────
-    property string _opacEntryVal:       "0.90"
-    property string _blurSizeEntryVal:   "2"
-    property string _blurPassesEntryVal: "4"
-    property string _gapsInnerEntryVal:  "6"
-    property string _gapsOuterEntryVal:  "12"
-    property string _borderWEntryVal:    "2"
-    property string _borderREntryVal:    "20"
+    property string _opacEntryVal:       ""
+    property string _blurSizeEntryVal:   ""
+    property string _blurPassesEntryVal: ""
+    property string _gapsInnerEntryVal:  ""
+    property string _gapsOuterEntryVal:  ""
+    property string _borderWEntryVal:    ""
+    property string _borderREntryVal:    ""
 
     // Load dock + rofi + sddm + hyprland values when CC opens
     Connections {
@@ -92,11 +92,12 @@ PanelWindow {
     // Read hyprland config values
     Process {
         id: _hyprlandValReader
+        // Use grep -A 25 for blur so the block lookup doesn't depend on ^} matching indented braces.
         command: ["bash", "-c",
             'f="$HOME/.config/hypr/hyprviz.conf"; ' +
             'grep "active_opacity = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9.]+"; ' +
-            'sed -n "/blur {/,/^}/p" "$f" 2>/dev/null | grep "size = " | head -1 | grep -oP "[0-9]+"; ' +
-            'sed -n "/blur {/,/^}/p" "$f" 2>/dev/null | grep "passes = " | head -1 | grep -oP "[0-9]+"; ' +
+            'grep -A 25 "blur {" "$f" 2>/dev/null | grep "size = " | head -1 | grep -oP "[0-9]+"; ' +
+            'grep -A 25 "blur {" "$f" 2>/dev/null | grep "passes = " | head -1 | grep -oP "[0-9]+"; ' +
             'grep "gaps_in = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
             'grep "gaps_out = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
             'grep "border_size = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
@@ -108,15 +109,17 @@ PanelWindow {
             onRead: function(l) { _hyprlandValReader._output += l.trim() + "\n" }
         }
         onExited: {
-            const lines = _hyprlandValReader._output.trim().split("\n")
-            _hyprlandValReader._output = ""
-            if (lines.length > 0 && lines[0]) _opacEntryVal = lines[0]
-            if (lines.length > 1 && lines[1]) _blurSizeEntryVal = lines[1]
-            if (lines.length > 2 && lines[2]) _blurPassesEntryVal = lines[2]
-            if (lines.length > 3 && lines[3]) _gapsInnerEntryVal = lines[3]
-            if (lines.length > 4 && lines[4]) _gapsOuterEntryVal = lines[4]
-            if (lines.length > 5 && lines[5]) _borderWEntryVal = lines[5]
-            if (lines.length > 6 && lines[6]) _borderREntryVal = lines[6]
+            const lines = _output.trim().split("\n")
+            _output = ""
+            // Force-set both the backing property AND the TextInput text so stale
+            // QML bindings (broken by prior user edits) are always refreshed.
+            if (lines[0] && lines[0].length > 0) { _opacEntryVal      = lines[0]; _opacTI.text      = lines[0] }
+            if (lines[1] && lines[1].length > 0) { _blurSizeEntryVal  = lines[1]; _blurSizeTI.text  = lines[1] }
+            if (lines[2] && lines[2].length > 0) { _blurPassesEntryVal= lines[2]; _blurPassesTI.text= lines[2] }
+            if (lines.length > 3) { _gapsInnerEntryVal = lines[3] || "0"; _gapsInnerTI.text  = _gapsInnerEntryVal }
+            if (lines.length > 4) { _gapsOuterEntryVal = lines[4] || "0"; _gapsOuterTI.text  = _gapsOuterEntryVal }
+            if (lines.length > 5) { _borderWEntryVal   = lines[5] || "0"; _borderWTI.text    = _borderWEntryVal }
+            if (lines.length > 6) { _borderREntryVal   = lines[6] || "0"; _borderRTI.text    = _borderREntryVal }
         }
     }
     Process {
@@ -1325,6 +1328,7 @@ PanelWindow {
                                     border.width: 1
                                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                     TextInput {
+                                        id: _opacTI
                                         anchors { fill: parent; margins: 6 }
                                         text: _opacEntryVal
                                         color: Theme.cPrimary
@@ -1347,8 +1351,8 @@ PanelWindow {
                                     }
                                 }
                             }
-                            Process { id: _opacDec; running: false; onExited: running = false }
-                            Process { id: _opacInc; running: false; onExited: running = false }
+                            Process { id: _opacDec; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
+                            Process { id: _opacInc; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
                             Process { id: _opacSet; running: false }
 
                             // ── Blur Size +/- buttons with direct entry ──────────
@@ -1375,6 +1379,7 @@ PanelWindow {
                                     border.width: 1
                                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                     TextInput {
+                                        id: _blurSizeTI
                                         anchors { fill: parent; margins: 6 }
                                         text: _blurSizeEntryVal
                                         color: Theme.cPrimary
@@ -1397,8 +1402,8 @@ PanelWindow {
                                     }
                                 }
                             }
-                            Process { id: _blurSizeDec; running: false; onExited: running = false }
-                            Process { id: _blurSizeInc; running: false; onExited: running = false }
+                            Process { id: _blurSizeDec; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
+                            Process { id: _blurSizeInc; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
                             Process { id: _blurSizeSet; running: false }
 
                             // ── Blur Passes +/- buttons with direct entry ────────
@@ -1425,6 +1430,7 @@ PanelWindow {
                                     border.width: 1
                                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                     TextInput {
+                                        id: _blurPassesTI
                                         anchors { fill: parent; margins: 6 }
                                         text: _blurPassesEntryVal
                                         color: Theme.cPrimary
@@ -1447,8 +1453,8 @@ PanelWindow {
                                     }
                                 }
                             }
-                            Process { id: _blurPassesDec; running: false; onExited: running = false }
-                            Process { id: _blurPassesInc; running: false; onExited: running = false }
+                            Process { id: _blurPassesDec; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
+                            Process { id: _blurPassesInc; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
                             Process { id: _blurPassesSet; running: false }
 
                             // ── Gaps & Border ─────────────────────────────────────
@@ -1464,12 +1470,19 @@ PanelWindow {
                                     font.pixelSize: 13
                                     Layout.preferredWidth: 100
                                 }
-                                CCPillBtn { text: "−"; onClicked: { _gapsInnerDec.command=[scriptDir+"/hyprland-gaps-inner-set.sh","-1"]; _gapsInnerDec.running=true } }
+                                CCPillBtn { text: "−"; onClicked: {
+                                    const nv = Math.max(0, (parseInt(_gapsInnerEntryVal) || 0) - 1)
+                                    _gapsInnerDec.command=[scriptDir+"/hyprland-gaps-inner-set.sh", nv.toString()]
+                                    _gapsInnerDec.running=true
+                                    _gapsInnerEntryVal = nv.toString()
+                                    _gapsInnerTI.text  = _gapsInnerEntryVal
+                                }}
                                 Rectangle {
                                     Layout.preferredWidth: 60; height: 28; radius: 7
                                     color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.12)
                                     border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                     TextInput {
+                                        id: _gapsInnerTI
                                         anchors { fill: parent; margins: 6 }
                                         text: _gapsInnerEntryVal; color: Theme.cPrimary
                                         font.family: Config.labelFont; font.pixelSize: 12
@@ -1478,7 +1491,13 @@ PanelWindow {
                                         onAccepted: { _gapsInnerSet.command=[scriptDir+"/hyprland-gaps-inner-set.sh",text]; _gapsInnerSet.running=true; _gapsInnerEntryVal=text }
                                     }
                                 }
-                                CCPillBtn { text: "+"; onClicked: { _gapsInnerInc.command=[scriptDir+"/hyprland-gaps-inner-set.sh","1"]; _gapsInnerInc.running=true } }
+                                CCPillBtn { text: "+"; onClicked: {
+                                    const nv = Math.min(100, (parseInt(_gapsInnerEntryVal) || 0) + 1)
+                                    _gapsInnerInc.command=[scriptDir+"/hyprland-gaps-inner-set.sh", nv.toString()]
+                                    _gapsInnerInc.running=true
+                                    _gapsInnerEntryVal = nv.toString()
+                                    _gapsInnerTI.text  = _gapsInnerEntryVal
+                                }}
                             }
                             Process { id:_gapsInnerDec; running:false }
                             Process { id:_gapsInnerInc; running:false }
@@ -1488,12 +1507,19 @@ PanelWindow {
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 6
                                 Text { text: "Outer Gaps"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 100 }
-                                CCPillBtn { text: "−"; onClicked: { _gapsOuterDec.command=[scriptDir+"/hyprland-gaps-outer-set.sh","-1"]; _gapsOuterDec.running=true } }
+                                CCPillBtn { text: "−"; onClicked: {
+                                    const nv = Math.max(0, (parseInt(_gapsOuterEntryVal) || 0) - 1)
+                                    _gapsOuterDec.command=[scriptDir+"/hyprland-gaps-outer-set.sh", nv.toString()]
+                                    _gapsOuterDec.running=true
+                                    _gapsOuterEntryVal = nv.toString()
+                                    _gapsOuterTI.text  = _gapsOuterEntryVal
+                                }}
                                 Rectangle {
                                     Layout.preferredWidth: 60; height: 28; radius: 7
                                     color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.12)
                                     border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                     TextInput {
+                                        id: _gapsOuterTI
                                         anchors { fill: parent; margins: 6 }
                                         text: _gapsOuterEntryVal; color: Theme.cPrimary
                                         font.family: Config.labelFont; font.pixelSize: 12
@@ -1502,7 +1528,13 @@ PanelWindow {
                                         onAccepted: { _gapsOuterSet.command=[scriptDir+"/hyprland-gaps-outer-set.sh",text]; _gapsOuterSet.running=true; _gapsOuterEntryVal=text }
                                     }
                                 }
-                                CCPillBtn { text: "+"; onClicked: { _gapsOuterInc.command=[scriptDir+"/hyprland-gaps-outer-set.sh","1"]; _gapsOuterInc.running=true } }
+                                CCPillBtn { text: "+"; onClicked: {
+                                    const nv = Math.min(100, (parseInt(_gapsOuterEntryVal) || 0) + 1)
+                                    _gapsOuterInc.command=[scriptDir+"/hyprland-gaps-outer-set.sh", nv.toString()]
+                                    _gapsOuterInc.running=true
+                                    _gapsOuterEntryVal = nv.toString()
+                                    _gapsOuterTI.text  = _gapsOuterEntryVal
+                                }}
                             }
                             Process { id:_gapsOuterDec; running:false }
                             Process { id:_gapsOuterInc; running:false }
@@ -1512,12 +1544,19 @@ PanelWindow {
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 6
                                 Text { text: "Border W"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 100 }
-                                CCPillBtn { text: "−"; onClicked: { _borderWDec.command=[scriptDir+"/hyprland-border-width-set.sh","-1"]; _borderWDec.running=true } }
+                                CCPillBtn { text: "−"; onClicked: {
+                                    const nv = Math.max(0, (parseInt(_borderWEntryVal) || 0) - 1)
+                                    _borderWDec.command=[scriptDir+"/hyprland-border-width-set.sh", nv.toString()]
+                                    _borderWDec.running=true
+                                    _borderWEntryVal = nv.toString()
+                                    _borderWTI.text  = _borderWEntryVal
+                                }}
                                 Rectangle {
                                     Layout.preferredWidth: 60; height: 28; radius: 7
                                     color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.12)
                                     border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                     TextInput {
+                                        id: _borderWTI
                                         anchors { fill: parent; margins: 6 }
                                         text: _borderWEntryVal; color: Theme.cPrimary
                                         font.family: Config.labelFont; font.pixelSize: 12
@@ -1526,7 +1565,13 @@ PanelWindow {
                                         onAccepted: { _borderWSet.command=[scriptDir+"/hyprland-border-width-set.sh",text]; _borderWSet.running=true; _borderWEntryVal=text }
                                     }
                                 }
-                                CCPillBtn { text: "+"; onClicked: { _borderWInc.command=[scriptDir+"/hyprland-border-width-set.sh","1"]; _borderWInc.running=true } }
+                                CCPillBtn { text: "+"; onClicked: {
+                                    const nv = Math.min(20, (parseInt(_borderWEntryVal) || 0) + 1)
+                                    _borderWInc.command=[scriptDir+"/hyprland-border-width-set.sh", nv.toString()]
+                                    _borderWInc.running=true
+                                    _borderWEntryVal = nv.toString()
+                                    _borderWTI.text  = _borderWEntryVal
+                                }}
                             }
                             Process { id:_borderWDec; running:false }
                             Process { id:_borderWInc; running:false }
@@ -1536,12 +1581,19 @@ PanelWindow {
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 6
                                 Text { text: "Border R"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 100 }
-                                CCPillBtn { text: "−"; onClicked: { _borderRDec.command=[scriptDir+"/hyprland-border-radius-set.sh","-1"]; _borderRDec.running=true } }
+                                CCPillBtn { text: "−"; onClicked: {
+                                    const nv = Math.max(0, (parseInt(_borderREntryVal) || 0) - 1)
+                                    _borderRDec.command=[scriptDir+"/hyprland-border-radius-set.sh", nv.toString()]
+                                    _borderRDec.running=true
+                                    _borderREntryVal = nv.toString()
+                                    _borderRTI.text  = _borderREntryVal
+                                }}
                                 Rectangle {
                                     Layout.preferredWidth: 60; height: 28; radius: 7
                                     color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.12)
                                     border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                     TextInput {
+                                        id: _borderRTI
                                         anchors { fill: parent; margins: 6 }
                                         text: _borderREntryVal; color: Theme.cPrimary
                                         font.family: Config.labelFont; font.pixelSize: 12
@@ -1550,7 +1602,13 @@ PanelWindow {
                                         onAccepted: { _borderRSet.command=[scriptDir+"/hyprland-border-radius-set.sh",text]; _borderRSet.running=true; _borderREntryVal=text }
                                     }
                                 }
-                                CCPillBtn { text: "+"; onClicked: { _borderRInc.command=[scriptDir+"/hyprland-border-radius-set.sh","1"]; _borderRInc.running=true } }
+                                CCPillBtn { text: "+"; onClicked: {
+                                    const nv = Math.min(50, (parseInt(_borderREntryVal) || 0) + 1)
+                                    _borderRInc.command=[scriptDir+"/hyprland-border-radius-set.sh", nv.toString()]
+                                    _borderRInc.running=true
+                                    _borderREntryVal = nv.toString()
+                                    _borderRTI.text  = _borderREntryVal
+                                }}
                             }
                             Process { id:_borderRDec; running:false }
                             Process { id:_borderRInc; running:false }

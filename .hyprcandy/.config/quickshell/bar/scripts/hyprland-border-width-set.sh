@@ -15,7 +15,7 @@ if [ -n "$value" ] && [ -f "$HYPR_CONF" ]; then
     if [ -n "$nv" ]; then
         [ "$nv" -lt 0 ] 2>/dev/null && nv=0
         [ "$nv" -gt 20 ] 2>/dev/null && nv=20
-        sed -i '/decoration {/,/^}/ s/border_size = [0-9]*/border_size = '"$nv"'/' "$HYPR_CONF"
+        sed -i "/general {/,/^}/ s/border_size = [0-9]*/border_size = $nv/" "$HYPR_CONF"
         hyprctl reload
         echo "ok"
     fi
